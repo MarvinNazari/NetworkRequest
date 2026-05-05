@@ -9,8 +9,8 @@ Pass any of the built-in ``HTTPMethod`` cases:
 
 ```swift
 let delete = NetworkRequest<Void, APIError>(
-    httpMethod: .delete,
-    url: URL(string: "https://api.example.com/users/42")!
+  httpMethod: .delete,
+  url: URL(string: "https://api.example.com/users/42")!
 )
 ```
 
@@ -18,7 +18,7 @@ Define custom methods by initializing ``HTTPMethod`` directly:
 
 ```swift
 extension HTTPMethod {
-    static let link = HTTPMethod(rawValue: "LINK")
+  static let link = HTTPMethod(rawValue: "LINK")
 }
 ```
 
@@ -31,11 +31,11 @@ collision:
 
 ```swift
 let request = NetworkRequest<User, APIError>(
-    url: URL(string: "https://api.example.com/me")!,
-    additionalHeaderFields: [
-        "Authorization": "Bearer \(token)",
-        "X-Client-Version": appVersion,
-    ]
+  url: URL(string: "https://api.example.com/me")!,
+  additionalHeaderFields: [
+    "Authorization": "Bearer \(token)",
+    "X-Client-Version": appVersion,
+  ]
 )
 ```
 
@@ -45,9 +45,9 @@ Both default to the system defaults. Override on a per-request basis:
 
 ```swift
 let request = NetworkRequest<User, APIError>(
-    url: URL(string: "https://api.example.com/me")!,
-    cachePolicy: .reloadIgnoringLocalCacheData,
-    timeoutInterval: 10
+  url: URL(string: "https://api.example.com/me")!,
+  cachePolicy: .reloadIgnoringLocalCacheData,
+  timeoutInterval: 10
 )
 ```
 
@@ -59,7 +59,7 @@ dispatch time, not at construction time:
 
 ```swift
 let now = NetworkRequest<Telemetry, APIError>(
-    url: URL(string: "https://api.example.com/now?t=\(Date().timeIntervalSince1970)")!
+  url: URL(string: "https://api.example.com/now?t=\(Date().timeIntervalSince1970)")!
 )
 ```
 

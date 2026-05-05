@@ -11,13 +11,13 @@ Add NetworkRequest to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/MarvinNazari/NetworkRequest", from: "1.0.0"),
+  .package(url: "https://github.com/MarvinNazari/NetworkRequest", from: "1.0.0"),
 ],
 targets: [
-    .target(
-        name: "MyApp",
-        dependencies: ["NetworkRequest"]
-    ),
+  .target(
+    name: "MyApp",
+    dependencies: ["NetworkRequest"]
+  ),
 ]
 ```
 
@@ -34,12 +34,12 @@ Model your response and (optionally) your API's error envelope:
 import NetworkRequest
 
 struct User: Decodable, Sendable {
-    let id: Int
-    let name: String
+  let id: Int
+  let name: String
 }
 
 struct APIError: Decodable, Error, Sendable {
-    let message: String
+  let message: String
 }
 ```
 
@@ -47,8 +47,8 @@ Build a typed request:
 
 ```swift
 let me = NetworkRequest<User, APIError>(
-    url: URL(string: "https://api.example.com/me")!,
-    additionalHeaderFields: ["Authorization": "Bearer \(token)"]
+  url: URL(string: "https://api.example.com/me")!,
+  additionalHeaderFields: ["Authorization": "Bearer \(token)"]
 )
 ```
 
@@ -71,7 +71,7 @@ If your API doesn't have a structured error envelope, use
 
 ```swift
 let me = NetworkRequest<User, UnexpectedHTTPResponse>(
-    url: URL(string: "https://api.example.com/me")!
+  url: URL(string: "https://api.example.com/me")!
 )
 ```
 
@@ -79,7 +79,7 @@ Or use `Never` if you don't want any status-code validation at all:
 
 ```swift
 let me = NetworkRequest<User, Never>(
-    url: URL(string: "https://api.example.com/me")!
+  url: URL(string: "https://api.example.com/me")!
 )
 ```
 
@@ -87,13 +87,13 @@ let me = NetworkRequest<User, Never>(
 
 ```swift
 struct CreateUser: Encodable {
-    let name: String
+  let name: String
 }
 
 let create = NetworkRequest<User, APIError>(
-    httpMethod: .post,
-    url: URL(string: "https://api.example.com/users")!,
-    body: try .json(parameters: CreateUser(name: "Ada"))
+  httpMethod: .post,
+  url: URL(string: "https://api.example.com/users")!,
+  body: try .json(parameters: CreateUser(name: "Ada"))
 )
 
 let (data, response) = try await URLSession.shared.data(for: create.urlRequest())

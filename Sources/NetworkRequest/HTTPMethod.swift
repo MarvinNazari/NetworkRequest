@@ -14,7 +14,7 @@ import Foundation
 ///
 /// ```swift
 /// extension HTTPMethod {
-///     static let link = HTTPMethod(rawValue: "LINK")
+///  static let link = HTTPMethod(rawValue: "LINK")
 /// }
 /// ```
 public struct HTTPMethod: RawRepresentable, Hashable, Sendable {

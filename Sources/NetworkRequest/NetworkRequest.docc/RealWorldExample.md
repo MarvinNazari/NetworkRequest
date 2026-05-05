@@ -27,19 +27,19 @@ The recipe in three pieces:
 import Foundation
 
 public struct APIConfiguration: Sendable {
-    public let baseURL: URL
-    public let urlSession: URLSession
-    public let additionalHeaderFields: [String: String]
+  public let baseURL: URL
+  public let urlSession: URLSession
+  public let additionalHeaderFields: [String: String]
 
-    public init(
-        baseURL: URL,
-        urlSession: URLSession = .shared,
-        additionalHeaderFields: [String: String] = [:]
-    ) {
-        self.baseURL = baseURL
-        self.urlSession = urlSession
-        self.additionalHeaderFields = additionalHeaderFields
-    }
+  public init(
+    baseURL: URL,
+    urlSession: URLSession = .shared,
+    additionalHeaderFields: [String: String] = [:]
+  ) {
+    self.baseURL = baseURL
+    self.urlSession = urlSession
+    self.additionalHeaderFields = additionalHeaderFields
+  }
 }
 ```
 
@@ -53,20 +53,20 @@ attach a bearer token.
 import NetworkRequest
 
 public struct APIRequest<Response: Sendable>: Sendable {
-    public let authorized: Bool
-    public let request: @Sendable (APIConfiguration) throws -> NetworkRequest<Response, APIError>
+  public let authorized: Bool
+  public let request: @Sendable (APIConfiguration) throws -> NetworkRequest<Response, APIError>
 
-    public init(
-        authorized: Bool = true,
-        request: @Sendable @escaping (APIConfiguration) throws -> NetworkRequest<Response, APIError>
-    ) {
-        self.authorized = authorized
-        self.request = request
-    }
+  public init(
+    authorized: Bool = true,
+    request: @Sendable @escaping (APIConfiguration) throws -> NetworkRequest<Response, APIError>
+  ) {
+    self.authorized = authorized
+    self.request = request
+  }
 }
 
 public struct APIError: Decodable, Error, Sendable {
-    public let message: String
+  public let message: String
 }
 ```
 
@@ -78,35 +78,35 @@ refresh them lazily, etc.
 
 ```swift
 public actor APIClient {
-    private let configuration: APIConfiguration
-    private let accessToken: @Sendable () async throws -> String?
+  private let configuration: APIConfiguration
+  private let accessToken: @Sendable () async throws -> String?
 
-    public init(
-        configuration: APIConfiguration,
-        accessToken: @Sendable @escaping () async throws -> String? = { nil }
-    ) {
-        self.configuration = configuration
-        self.accessToken = accessToken
+  public init(
+    configuration: APIConfiguration,
+    accessToken: @Sendable @escaping () async throws -> String? = { nil }
+  ) {
+    self.configuration = configuration
+    self.accessToken = accessToken
+  }
+
+  @discardableResult
+  public func send<Response>(
+    _ apiRequest: APIRequest<Response>
+  ) async throws -> Response {
+    let networkRequest = try apiRequest.request(configuration)
+    var urlRequest = try networkRequest.urlRequest()
+
+    for (key, value) in configuration.additionalHeaderFields {
+      urlRequest.setValue(value, forHTTPHeaderField: key)
     }
 
-    @discardableResult
-    public func send<Response>(
-        _ apiRequest: APIRequest<Response>
-    ) async throws -> Response {
-        let networkRequest = try apiRequest.request(configuration)
-        var urlRequest = try networkRequest.urlRequest()
-
-        for (key, value) in configuration.additionalHeaderFields {
-            urlRequest.setValue(value, forHTTPHeaderField: key)
-        }
-
-        if apiRequest.authorized, let token = try await accessToken() {
-            urlRequest.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        let (data, response) = try await configuration.urlSession.data(for: urlRequest)
-        return try networkRequest.parse(data, response)
+    if apiRequest.authorized, let token = try await accessToken() {
+      urlRequest.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     }
+
+    let (data, response) = try await configuration.urlSession.data(for: urlRequest)
+    return try networkRequest.parse(data, response)
+  }
 }
 ```
 
@@ -120,32 +120,32 @@ With those primitives, an endpoint is one short factory function:
 
 ```swift
 struct User: Decodable, Sendable {
-    let id: Int
-    let name: String
+  let id: Int
+  let name: String
 }
 
 extension APIRequest where Response == User {
-    static func fetchCurrentUser() -> Self {
-        APIRequest { config in
-            NetworkRequest(
-                url: config.baseURL.appendingPathComponent("me")
-            )
-        }
+  static func fetchCurrentUser() -> Self {
+    APIRequest { config in
+      NetworkRequest(
+        url: config.baseURL.appendingPathComponent("me")
+      )
     }
+  }
 }
 
 extension APIRequest where Response == User {
-    static func updateName(_ name: String) -> Self {
-        APIRequest { config in
-            // The `try` is for `.json(parameters:)`, which can throw
-            // encoder errors — `NetworkRequest.init` itself does not throw.
-            try NetworkRequest(
-                httpMethod: .patch,
-                url: config.baseURL.appendingPathComponent("me"),
-                body: .json(parameters: ["name": name])
-            )
-        }
+  static func updateName(_ name: String) -> Self {
+    APIRequest { config in
+      // The `try` is for `.json(parameters:)`, which can throw
+      // encoder errors — `NetworkRequest.init` itself does not throw.
+      try NetworkRequest(
+        httpMethod: .patch,
+        url: config.baseURL.appendingPathComponent("me"),
+        body: .json(parameters: ["name": name])
+      )
     }
+  }
 }
 ```
 
@@ -153,10 +153,10 @@ extension APIRequest where Response == User {
 
 ```swift
 let client = APIClient(
-    configuration: APIConfiguration(
-        baseURL: URL(string: "https://api.example.com")!
-    ),
-    accessToken: { keychain.loadAccessToken() }
+  configuration: APIConfiguration(
+    baseURL: URL(string: "https://api.example.com")!
+  ),
+  accessToken: { keychain.loadAccessToken() }
 )
 
 let me = try await client.send(.fetchCurrentUser())

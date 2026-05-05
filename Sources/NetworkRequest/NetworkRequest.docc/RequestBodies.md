@@ -9,12 +9,12 @@ The most common case — encode any `Encodable` value as JSON:
 
 ```swift
 struct CreateUser: Encodable {
-    let name: String
-    let createdAt: Date
+  let name: String
+  let createdAt: Date
 }
 
 let body = try NetworkRequestBody.json(
-    parameters: CreateUser(name: "Ada", createdAt: .now)
+  parameters: CreateUser(name: "Ada", createdAt: .now)
 )
 ```
 
@@ -28,9 +28,9 @@ When you don't want to define a struct for an ad-hoc payload, encode a
 
 ```swift
 let body = try NetworkRequestBody.json(parameters: [
-    "name": "Ada",
-    "age": 36,
-    "active": true,
+  "name": "Ada",
+  "age": 36,
+  "active": true,
 ])
 ```
 
@@ -40,8 +40,8 @@ For `application/x-www-form-urlencoded` payloads:
 
 ```swift
 let body = try NetworkRequestBody.form(dictionary: [
-    "grant_type": "refresh_token",
-    "refresh_token": refreshToken,
+  "grant_type": "refresh_token",
+  "refresh_token": refreshToken,
 ])
 ```
 
@@ -54,8 +54,8 @@ payloads — `multipart/form-data`, protobuf, image uploads, etc:
 
 ```swift
 let body = NetworkRequestBody(
-    data: pngData,
-    contentType: "image/png"
+  data: pngData,
+  contentType: "image/png"
 )
 ```
 
