@@ -82,6 +82,7 @@ let user = try create.parse(data, response)
 
 ## Where to next
 
+- <doc:RealWorldExample> — a complete example wrapping NetworkRequest in an API client with bearer auth.
 - <doc:BuildingRequests> — methods, headers, cache policy, timeouts, debugging.
 - <doc:ParsingResponses> — pick the right convenience initializer for your endpoint.
 - <doc:RequestBodies> — JSON, form-urlencoded, and custom payloads.

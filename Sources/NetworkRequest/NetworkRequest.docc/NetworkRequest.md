@@ -33,6 +33,7 @@ kind of error the API may return.
 ### Essentials
 
 - <doc:GettingStarted>
+- <doc:RealWorldExample>
 
 ### Building Requests
 
