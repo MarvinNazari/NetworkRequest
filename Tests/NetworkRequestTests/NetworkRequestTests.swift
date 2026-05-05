@@ -1,8 +1,5 @@
 import Testing
 import Foundation
-#if canImport(FoundationNetworking)
-import FoundationNetworking
-#endif
 @testable import NetworkRequest
 
 @Suite("URLRequest construction")

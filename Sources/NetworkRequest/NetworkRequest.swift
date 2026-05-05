@@ -3,9 +3,6 @@
 //
 
 import Foundation
-#if canImport(FoundationNetworking)
-import FoundationNetworking
-#endif
 
 /// A type-safe, execution-agnostic description of an HTTP request and how to
 /// parse its response.

@@ -1,7 +1,4 @@
 import Foundation
-#if canImport(FoundationNetworking)
-import FoundationNetworking
-#endif
 
 /// A `URLProtocol` subclass that intercepts every request and routes it
 /// through a per-test handler. Lets the suite assert outgoing requests and
