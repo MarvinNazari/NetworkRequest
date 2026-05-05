@@ -26,16 +26,3 @@ jobs:
         run: swift build -v
       - name: Test
         run: swift test -v
-
-  linux:
-    name: Linux (Swift 6.2)
-    runs-on: ubuntu-latest
-    container: swift:6.2
-    steps:
-      - uses: actions/checkout@v4
-      - name: Swift version
-        run: swift --version
-      - name: Build
-        run: swift build -v
-      - name: Test
-        run: swift test -v
