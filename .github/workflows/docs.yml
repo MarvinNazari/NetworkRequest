@@ -34,6 +34,22 @@ jobs:
             --transform-for-static-hosting \
             --hosting-base-path NetworkRequest \
             --output-path ./docs
+      - name: Add root redirect
+        run: |
+          cat > ./docs/index.html <<'EOF'
+          <!doctype html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>NetworkRequest</title>
+            <meta http-equiv="refresh" content="0; url=./documentation/networkrequest/">
+            <link rel="canonical" href="./documentation/networkrequest/">
+          </head>
+          <body>
+            <p>Redirecting to <a href="./documentation/networkrequest/">the NetworkRequest documentation</a>…</p>
+          </body>
+          </html>
+          EOF
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
