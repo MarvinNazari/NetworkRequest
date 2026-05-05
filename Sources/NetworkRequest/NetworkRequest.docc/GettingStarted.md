@@ -47,7 +47,7 @@ Build a typed request:
 
 ```swift
 let me = NetworkRequest<User, APIError>(
-  url: URL(string: "https://api.example.com/me")!,
+  url: URL(string: "https://api.example.com/me"),
   additionalHeaderFields: ["Authorization": "Bearer \(token)"]
 )
 ```
@@ -71,7 +71,7 @@ If your API doesn't have a structured error envelope, use
 
 ```swift
 let me = NetworkRequest<User, UnexpectedHTTPResponse>(
-  url: URL(string: "https://api.example.com/me")!
+  url: URL(string: "https://api.example.com/me")
 )
 ```
 
@@ -79,7 +79,7 @@ Or use `Never` if you don't want any status-code validation at all:
 
 ```swift
 let me = NetworkRequest<User, Never>(
-  url: URL(string: "https://api.example.com/me")!
+  url: URL(string: "https://api.example.com/me")
 )
 ```
 
@@ -92,7 +92,7 @@ struct CreateUser: Encodable {
 
 let create = NetworkRequest<User, APIError>(
   httpMethod: .post,
-  url: URL(string: "https://api.example.com/users")!,
+  url: URL(string: "https://api.example.com/users"),
   body: try .json(parameters: CreateUser(name: "Ada"))
 )
 

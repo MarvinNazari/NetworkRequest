@@ -10,7 +10,7 @@ Pass any of the built-in ``HTTPMethod`` cases:
 ```swift
 let delete = NetworkRequest<Void, APIError>(
   httpMethod: .delete,
-  url: URL(string: "https://api.example.com/users/42")!
+  url: URL(string: "https://api.example.com/users/42")
 )
 ```
 
@@ -31,7 +31,7 @@ collision:
 
 ```swift
 let request = NetworkRequest<User, APIError>(
-  url: URL(string: "https://api.example.com/me")!,
+  url: URL(string: "https://api.example.com/me"),
   additionalHeaderFields: [
     "Authorization": "Bearer \(token)",
     "X-Client-Version": appVersion,
@@ -45,7 +45,7 @@ Both default to the system defaults. Override on a per-request basis:
 
 ```swift
 let request = NetworkRequest<User, APIError>(
-  url: URL(string: "https://api.example.com/me")!,
+  url: URL(string: "https://api.example.com/me"),
   cachePolicy: .reloadIgnoringLocalCacheData,
   timeoutInterval: 10
 )
@@ -59,7 +59,7 @@ dispatch time, not at construction time:
 
 ```swift
 let now = NetworkRequest<Telemetry, APIError>(
-  url: URL(string: "https://api.example.com/now?t=\(Date().timeIntervalSince1970)")!
+  url: URL(string: "https://api.example.com/now?t=\(Date().timeIntervalSince1970)")
 )
 ```
 

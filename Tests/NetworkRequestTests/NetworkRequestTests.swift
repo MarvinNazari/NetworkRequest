@@ -110,6 +110,15 @@ struct NetworkRequestTests {
     #expect(urlRequest.timeoutInterval == 60)
   }
 
+  @Test func nilURLThrowsBadURL() {
+    let request = NetworkRequest<Data, Never>(url: URL(string: ""))
+    #expect {
+      try request.urlRequest()
+    } throws: { error in
+      (error as? URLError)?.code == .badURL
+    }
+  }
+
   @Test func urlClosureEvaluatedLazily() throws {
     let counter = Counter()
     let request = NetworkRequest<Data, Never>(

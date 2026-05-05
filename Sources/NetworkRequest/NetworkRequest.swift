@@ -26,7 +26,7 @@ import Foundation
 /// struct APIError: Decodable, Error, Sendable { let message: String }
 ///
 /// let request = NetworkRequest<User, APIError>(
-///  url: URL(string: "https://api.example.com/me")!
+///   url: URL(string: "https://api.example.com/me")
 /// )
 ///
 /// let (data, response) = try await URLSession.shared.data(for: request.urlRequest())
@@ -138,7 +138,7 @@ public extension NetworkRequest {
   ///   - parse: A closure converting the response to `Response`.
   init(
     httpMethod: HTTPMethod = .get,
-    url: @Sendable @escaping () throws -> URL,
+    url: @Sendable @escaping () throws -> URL?,
     body: NetworkRequestBody? = nil,
     additionalHeaderFields: [String: String] = [:],
     cachePolicy: URLRequest.CachePolicy? = nil,
@@ -147,7 +147,10 @@ public extension NetworkRequest {
   ) {
     self.init(
       urlRequest: {
-        var urlRequest = URLRequest(url: try url())
+        guard let resolvedURL = try url() else {
+          throw URLError(.badURL)
+        }
+        var urlRequest = URLRequest(url: resolvedURL)
 
         if let cachePolicy = cachePolicy {
           urlRequest.cachePolicy = cachePolicy
@@ -195,7 +198,7 @@ public extension NetworkRequest where Response: Decodable & Sendable, ErrorRespo
   ///
   /// - Parameters:
   ///   - httpMethod: The HTTP method to use. Defaults to ``HTTPMethod/get``.
-  ///   - url: The destination URL (auto-closure, evaluated lazily).
+  ///   - url: The destination URL (auto-closure, evaluated lazily). Throws `URLError(.badURL)` if `nil`.
   ///   - body: The request body to send, or `nil`.
   ///   - additionalHeaderFields: Extra headers to set on the request.
   ///   - cachePolicy: A cache policy to apply, or `nil` for the default.
@@ -204,7 +207,7 @@ public extension NetworkRequest where Response: Decodable & Sendable, ErrorRespo
   ///     decoding. Defaults to a decoder configured for ISO-8601 dates.
   init(
     httpMethod: HTTPMethod = .get,
-    url: @autoclosure @Sendable @escaping () throws -> URL,
+    url: @autoclosure @Sendable @escaping () throws -> URL?,
     body: NetworkRequestBody? = nil,
     additionalHeaderFields: [String: String] = [:],
     cachePolicy: URLRequest.CachePolicy? = nil,
@@ -254,7 +257,7 @@ public extension NetworkRequest where Response: Decodable & Sendable, ErrorRespo
   ///
   /// - Parameters:
   ///   - httpMethod: The HTTP method to use. Defaults to ``HTTPMethod/get``.
-  ///   - url: The destination URL.
+  ///   - url: The destination URL. Throws `URLError(.badURL)` if `nil`.
   ///   - body: The request body to send, or `nil`.
   ///   - additionalHeaderFields: Extra headers to set on the request.
   ///   - cachePolicy: A cache policy to apply, or `nil` for the default.
@@ -262,7 +265,7 @@ public extension NetworkRequest where Response: Decodable & Sendable, ErrorRespo
   ///   - decoder: The `JSONDecoder` used to decode the response body.
   init(
     httpMethod: HTTPMethod = .get,
-    url: @autoclosure @Sendable @escaping () throws -> URL,
+    url: @autoclosure @Sendable @escaping () throws -> URL?,
     body: NetworkRequestBody? = nil,
     additionalHeaderFields: [String: String] = [:],
     cachePolicy: URLRequest.CachePolicy? = nil,
@@ -300,7 +303,7 @@ public extension NetworkRequest where Response == Data, ErrorResponse == Unexpec
   ///   ``UnexpectedHTTPResponse`` is thrown with the status code and raw body.
   init(
     httpMethod: HTTPMethod = .get,
-    url: @autoclosure @Sendable @escaping () throws -> URL,
+    url: @autoclosure @Sendable @escaping () throws -> URL?,
     body: NetworkRequestBody? = nil,
     additionalHeaderFields: [String: String] = [:],
     cachePolicy: URLRequest.CachePolicy? = nil,
@@ -340,7 +343,7 @@ public extension NetworkRequest where Response == Void, ErrorResponse == Unexpec
   ///   ``UnexpectedHTTPResponse`` is thrown with the status code and raw body.
   init(
     httpMethod: HTTPMethod = .get,
-    url: @autoclosure @Sendable @escaping () throws -> URL,
+    url: @autoclosure @Sendable @escaping () throws -> URL?,
     body: NetworkRequestBody? = nil,
     additionalHeaderFields: [String: String] = [:],
     cachePolicy: URLRequest.CachePolicy? = nil,
@@ -380,7 +383,7 @@ public extension NetworkRequest where Response: Decodable & Sendable, ErrorRespo
   ///
   /// - Parameters:
   ///   - httpMethod: The HTTP method to use. Defaults to ``HTTPMethod/get``.
-  ///   - url: The destination URL.
+  ///   - url: The destination URL. Throws `URLError(.badURL)` if `nil`.
   ///   - body: The request body to send, or `nil`.
   ///   - additionalHeaderFields: Extra headers to set on the request.
   ///   - cachePolicy: A cache policy to apply, or `nil` for the default.
@@ -388,7 +391,7 @@ public extension NetworkRequest where Response: Decodable & Sendable, ErrorRespo
   ///   - decoder: The `JSONDecoder` used to decode the response body.
   init(
     httpMethod: HTTPMethod = .get,
-    url: @autoclosure @Sendable @escaping () throws -> URL,
+    url: @autoclosure @Sendable @escaping () throws -> URL?,
     body: NetworkRequestBody? = nil,
     additionalHeaderFields: [String: String] = [:],
     cachePolicy: URLRequest.CachePolicy? = nil,
@@ -424,7 +427,7 @@ public extension NetworkRequest where Response == Data, ErrorResponse == Never {
   /// you need status-code-aware error handling.
   init(
     httpMethod: HTTPMethod = .get,
-    url: @autoclosure @Sendable @escaping () throws -> URL,
+    url: @autoclosure @Sendable @escaping () throws -> URL?,
     body: NetworkRequestBody? = nil,
     additionalHeaderFields: [String: String] = [:],
     cachePolicy: URLRequest.CachePolicy? = nil,
@@ -460,7 +463,7 @@ public extension NetworkRequest where Response == Data, ErrorResponse: Decodable
   ///
   /// - Parameters:
   ///   - httpMethod: The HTTP method to use. Defaults to ``HTTPMethod/get``.
-  ///   - url: The destination URL.
+  ///   - url: The destination URL. Throws `URLError(.badURL)` if `nil`.
   ///   - body: The request body to send, or `nil`.
   ///   - additionalHeaderFields: Extra headers to set on the request.
   ///   - cachePolicy: A cache policy to apply, or `nil` for the default.
@@ -468,7 +471,7 @@ public extension NetworkRequest where Response == Data, ErrorResponse: Decodable
   ///   - decoder: The `JSONDecoder` used to decode the error body.
   init(
     httpMethod: HTTPMethod = .get,
-    url: @autoclosure @Sendable @escaping () throws -> URL,
+    url: @autoclosure @Sendable @escaping () throws -> URL?,
     body: NetworkRequestBody? = nil,
     additionalHeaderFields: [String: String] = [:],
     cachePolicy: URLRequest.CachePolicy? = nil,
@@ -515,7 +518,7 @@ public extension NetworkRequest where Response == Void, ErrorResponse == Never {
   /// handling.
   init(
     httpMethod: HTTPMethod = .get,
-    url: @autoclosure @Sendable @escaping () throws -> URL,
+    url: @autoclosure @Sendable @escaping () throws -> URL?,
     body: NetworkRequestBody? = nil,
     additionalHeaderFields: [String: String] = [:],
     cachePolicy: URLRequest.CachePolicy? = nil,
@@ -551,7 +554,7 @@ public extension NetworkRequest where Response == Void, ErrorResponse: Decodable
   ///
   /// - Parameters:
   ///   - httpMethod: The HTTP method to use. Defaults to ``HTTPMethod/get``.
-  ///   - url: The destination URL.
+  ///   - url: The destination URL. Throws `URLError(.badURL)` if `nil`.
   ///   - body: The request body to send, or `nil`.
   ///   - additionalHeaderFields: Extra headers to set on the request.
   ///   - cachePolicy: A cache policy to apply, or `nil` for the default.
@@ -559,7 +562,7 @@ public extension NetworkRequest where Response == Void, ErrorResponse: Decodable
   ///   - decoder: The `JSONDecoder` used to decode the error body.
   init(
     httpMethod: HTTPMethod = .get,
-    url: @autoclosure @Sendable @escaping () throws -> URL,
+    url: @autoclosure @Sendable @escaping () throws -> URL?,
     body: NetworkRequestBody? = nil,
     additionalHeaderFields: [String: String] = [:],
     cachePolicy: URLRequest.CachePolicy? = nil,

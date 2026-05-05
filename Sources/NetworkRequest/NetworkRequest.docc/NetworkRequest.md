@@ -16,7 +16,7 @@ struct User: Decodable, Sendable { let id: Int; let name: String }
 struct APIError: Decodable, Error, Sendable { let message: String }
 
 let request = NetworkRequest<User, APIError>(
-  url: URL(string: "https://api.example.com/me")!,
+  url: URL(string: "https://api.example.com/me"),
   additionalHeaderFields: ["Authorization": "Bearer \(token)"]
 )
 

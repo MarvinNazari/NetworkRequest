@@ -30,6 +30,10 @@ First public release.
   execution-agnostic HTTP request description with two `@Sendable` closures,
   `urlRequest` and `parse`. Conditionally conforms to `Sendable` when its
   generic parameters do.
+- Convenience initializers accept `URL?` directly — call sites pass
+  `URL(string: "...")` without the `!` and the request throws
+  `URLError(.badURL)` if the URL turns out to be `nil`. Force-unwrapped
+  call sites still work via implicit promotion.
 - Nine convenience initializers covering the typed-response × typed-error
   matrix:
   - `Decodable + Decodable`, `Decodable + Never`, `Decodable + UnexpectedHTTPResponse`

@@ -57,7 +57,7 @@ let decoder = JSONDecoder()
 decoder.keyDecodingStrategy = .convertFromSnakeCase
 
 let request = NetworkRequest<User, APIError>(
-  url: URL(string: "https://api.example.com/me")!,
+  url: URL(string: "https://api.example.com/me"),
   decoder: decoder
 )
 ```

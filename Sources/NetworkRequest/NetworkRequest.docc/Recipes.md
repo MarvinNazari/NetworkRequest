@@ -23,7 +23,7 @@ extension URLSession {
 
 // Usage:
 let user = try await URLSession.shared.send(
-  NetworkRequest<User, APIError>(url: URL(string: "https://api.example.com/me")!)
+  NetworkRequest<User, APIError>(url: URL(string: "https://api.example.com/me"))
 )
 ```
 
@@ -128,7 +128,7 @@ URLProtocolMock.handler = { _ in
   return (response, Data(#"{"id":1,"name":"Ada"}"#.utf8))
 }
 let session = makeMockSession()
-let user = try await session.send(NetworkRequest<User, APIError>(url: URL(string: "https://test.local")!))
+let user = try await session.send(NetworkRequest<User, APIError>(url: URL(string: "https://test.local")))
 ```
 
 ## Logging every request
@@ -230,7 +230,7 @@ extension JSONDecoder {
 }
 
 let request = NetworkRequest<Activity, APIError>(
-  url: URL(string: "https://api.example.com/activities/1")!,
+  url: URL(string: "https://api.example.com/activities/1"),
   decoder: .apiDecoder
 )
 ```
@@ -279,7 +279,7 @@ when you need headers:
 ```swift
 let request = NetworkRequest<(User, String?), APIError>(
   httpMethod: .get,
-  url: { URL(string: "https://api.example.com/me")! },
+  url: { URL(string: "https://api.example.com/me") },
   parse: { data, response in
     let http = response as? HTTPURLResponse
     let etag = http?.value(forHTTPHeaderField: "ETag")
