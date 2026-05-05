@@ -44,8 +44,14 @@ kind of error the API may return.
 ### Parsing Responses
 
 - <doc:ParsingResponses>
+- ``UnexpectedHTTPResponse``
 
 ### Request Bodies
 
 - ``NetworkRequestBody``
 - <doc:RequestBodies>
+
+### Configuring decoders and encoders
+
+- ``Foundation/JSONDecoder/iso8601``
+- ``Foundation/JSONEncoder/iso8601``

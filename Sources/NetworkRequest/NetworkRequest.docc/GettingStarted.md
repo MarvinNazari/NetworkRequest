@@ -11,7 +11,7 @@ Add NetworkRequest to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/marvin-nazari/NetworkRequest", from: "1.0.0"),
+    .package(url: "https://github.com/MarvinNazari/NetworkRequest", from: "1.0.0"),
 ],
 targets: [
     .target(
@@ -61,7 +61,27 @@ let user = try me.parse(data, response)
 
 If the server returns a non-2xx status, ``NetworkRequest/NetworkRequest``
 decodes the body as `APIError` and **throws** it — your `do/catch` block
-sees it as a typed `APIError`.
+sees it as a typed `APIError`. If the body can't be decoded as `APIError`
+(unexpected HTML error page, empty body, etc.), the request throws
+``UnexpectedHTTPResponse`` instead, preserving the status code and raw
+bytes for diagnostics.
+
+If your API doesn't have a structured error envelope, use
+``UnexpectedHTTPResponse`` directly as the error type:
+
+```swift
+let me = NetworkRequest<User, UnexpectedHTTPResponse>(
+    url: URL(string: "https://api.example.com/me")!
+)
+```
+
+Or use `Never` if you don't want any status-code validation at all:
+
+```swift
+let me = NetworkRequest<User, Never>(
+    url: URL(string: "https://api.example.com/me")!
+)
+```
 
 ## A POST with a body
 

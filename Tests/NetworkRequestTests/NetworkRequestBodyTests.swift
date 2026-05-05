@@ -7,8 +7,15 @@ private struct CreateUser: Encodable {
   let age: Int
 }
 
+private struct ThrowingEncodable: Encodable {
+  struct Boom: Error {}
+  func encode(to encoder: Encoder) throws { throw Boom() }
+}
+
 @Suite("NetworkRequestBody")
 struct NetworkRequestBodyTests {
+
+  // MARK: JSON
 
   @Test func jsonFromEncodable() throws {
     let body = try NetworkRequestBody.json(parameters: CreateUser(name: "Ada", age: 36))
@@ -33,8 +40,36 @@ struct NetworkRequestBodyTests {
     #expect(object?["active"] as? Bool == true)
   }
 
-  @Test func formProducesURLEncodedPayload() throws {
-    let body = try NetworkRequestBody.form(dictionary: [
+  @Test func jsonPropagatesEncoderErrors() {
+    #expect(throws: ThrowingEncodable.Boom.self) {
+      try NetworkRequestBody.json(parameters: ThrowingEncodable())
+    }
+  }
+
+  @Test func jsonUsesISO8601DateStrategyByDefault() throws {
+    struct Stamped: Encodable { let at: Date }
+    let date = Date(timeIntervalSince1970: 0)
+    let body = try NetworkRequestBody.json(parameters: Stamped(at: date))
+    let string = String(data: body.data, encoding: .utf8) ?? ""
+    #expect(string.contains("1970-01-01T00:00:00Z"), "got: \(string)")
+  }
+
+  @Test func jsonRespectsCustomEncoder() throws {
+    struct Stamped: Encodable { let at: Date }
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .secondsSince1970
+    let body = try NetworkRequestBody.json(
+      parameters: Stamped(at: Date(timeIntervalSince1970: 100)),
+      encoder: encoder
+    )
+    let string = String(data: body.data, encoding: .utf8) ?? ""
+    #expect(string == #"{"at":100}"#, "got: \(string)")
+  }
+
+  // MARK: Form
+
+  @Test func formProducesURLEncodedPayload() {
+    let body = NetworkRequestBody.form(dictionary: [
       "grant_type": "refresh_token",
       "refresh_token": "abc",
     ])
@@ -45,20 +80,29 @@ struct NetworkRequestBodyTests {
     #expect(pairs == ["grant_type=refresh_token", "refresh_token=abc"])
   }
 
-  @Test func formPercentEncodesSpecialCharacters() throws {
-    let body = try NetworkRequestBody.form(dictionary: ["q": "hello world & friends"])
+  @Test(
+    "Form percent-encoding pins behavior",
+    arguments: [
+      ("hello world & friends", "hello%20world%20%26%20friends"),
+      ("a/b", "a/b"),
+      ("100%", "100%25"),
+      ("é", "%C3%A9"),
+      ("", ""),
+    ]
+  )
+  func formPercentEncoding(input: String, expected: String) {
+    let body = NetworkRequestBody.form(dictionary: ["q": input])
     let payload = String(data: body.data, encoding: .utf8) ?? ""
-    // URLComponents percent-encodes spaces as %20 and ampersand as %26 inside a value.
-    #expect(payload.contains("hello%20world%20%26%20friends"), "got: \(payload)")
+    #expect(payload == "q=\(expected)", "got: \(payload)")
   }
 
-  @Test func jsonUsesISO8601DateStrategyByDefault() throws {
-    struct Stamped: Encodable { let at: Date }
-    let date = Date(timeIntervalSince1970: 0)
-    let body = try NetworkRequestBody.json(parameters: Stamped(at: date))
-    let string = String(data: body.data, encoding: .utf8) ?? ""
-    #expect(string.contains("1970-01-01T00:00:00Z"), "got: \(string)")
+  @Test func emptyDictionaryProducesEmptyBody() {
+    let body = NetworkRequestBody.form(dictionary: [:])
+    #expect(body.data == Data())
+    #expect(body.contentType == "application/x-www-form-urlencoded")
   }
+
+  // MARK: Init
 
   @Test func customInitWrapsRawData() {
     let body = NetworkRequestBody(data: Data([1, 2, 3]), contentType: "application/octet-stream")

@@ -30,4 +30,11 @@ struct HTTPMethodTests {
     #expect(HTTPMethod.get == HTTPMethod(rawValue: "GET"))
     #expect(HTTPMethod.get != HTTPMethod.post)
   }
+
+  @Test func hashableInSet() {
+    let methods: Set<HTTPMethod> = [.get, .post, .get]
+    #expect(methods.count == 2)
+    #expect(methods.contains(.get))
+    #expect(methods.contains(.post))
+  }
 }

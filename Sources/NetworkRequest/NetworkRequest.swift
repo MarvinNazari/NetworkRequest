@@ -1,5 +1,5 @@
 //
-//  Copyright © 2023 Marvin Nazari. All rights reserved.
+//  Copyright © 2026 Marvin Nazari. All rights reserved.
 //
 
 import Foundation
@@ -20,8 +20,10 @@ import Foundation
 /// feed the response back through ``parse``.
 ///
 /// ```swift
-/// struct User: Decodable { let id: Int; let name: String }
-/// struct APIError: Decodable, Error { let message: String }
+/// import NetworkRequest
+///
+/// struct User: Decodable, Sendable { let id: Int; let name: String }
+/// struct APIError: Decodable, Error, Sendable { let message: String }
 ///
 /// let request = NetworkRequest<User, APIError>(
 ///     url: URL(string: "https://api.example.com/me")!
@@ -31,8 +33,12 @@ import Foundation
 /// let user = try request.parse(data, response)
 /// ```
 ///
+/// When an endpoint has no typed error envelope, use `Never` as the
+/// `ErrorResponse` parameter — `NetworkRequest<User, Never>` documents at the
+/// type level that the request never throws a decoded error.
+///
 /// See <doc:GettingStarted> for a full walkthrough.
-public struct NetworkRequest<Response, ErrorResponse> {
+public struct NetworkRequest<Response, ErrorResponse: Error> {
 
   // MARK: - Stored state
 
@@ -72,14 +78,36 @@ public struct NetworkRequest<Response, ErrorResponse> {
   /// A `curl` command equivalent to the request, useful for reproducing
   /// requests outside the app.
   ///
-  /// Returns an empty string if ``urlRequest`` throws when invoked.
-  public var cURLCommand: String {
-    let request = try? urlRequest()
-    return request?.cURLCommand ?? ""
+  /// Returns `nil` if ``urlRequest`` throws when invoked, or if the
+  /// underlying `URLRequest` has no URL.
+  public var cURLCommand: String? {
+    guard let request = try? urlRequest() else { return nil }
+    return request.cURLCommand
   }
 }
 
 extension NetworkRequest: Sendable where Response: Sendable, ErrorResponse: Sendable {}
+
+/// An error thrown by typed `NetworkRequest` initializers when the response
+/// is non-2xx and its body cannot be decoded as the declared `ErrorResponse`,
+/// or when the response is not an `HTTPURLResponse` at all.
+///
+/// Captures the status code (or `-1` for non-HTTP responses) and the raw
+/// body so callers can log, surface, or retry the request without losing
+/// the original failure context.
+public struct UnexpectedHTTPResponse: Error, Sendable {
+
+  /// The HTTP status code, or `-1` if the response was not an `HTTPURLResponse`.
+  public let statusCode: Int
+
+  /// The raw response body.
+  public let data: Data
+
+  public init(statusCode: Int, data: Data) {
+    self.statusCode = statusCode
+    self.data = data
+  }
+}
 
 // MARK: - Generic convenience initializer
 
@@ -93,9 +121,9 @@ public extension NetworkRequest {
   /// non-standard, or when you need to inspect headers during parsing.
   ///
   /// The constructed `URLRequest` always advertises `Accept: application/json`.
-  /// When `body` is supplied its `contentType` is added as `Content-Type`.
-  /// Values in `additionalHeaderFields` are applied last and may override
-  /// any of the above.
+  /// When `body` is supplied its `contentType` is set as `Content-Type`.
+  /// Values in `additionalHeaderFields` are applied last and replace any of
+  /// the above on collision.
   ///
   /// - Parameters:
   ///   - httpMethod: The HTTP method to use. Defaults to ``HTTPMethod/get``.
@@ -119,9 +147,7 @@ public extension NetworkRequest {
   ) {
     self.init(
       urlRequest: {
-        let urlToSend = try url()
-
-        var urlRequest = URLRequest(url: urlToSend)
+        var urlRequest = URLRequest(url: try url())
 
         if let cachePolicy = cachePolicy {
           urlRequest.cachePolicy = cachePolicy
@@ -132,15 +158,14 @@ public extension NetworkRequest {
         }
 
         urlRequest.httpMethod = httpMethod.rawValue
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
 
         if let body = body {
           urlRequest.httpBody = body.data
-          urlRequest.addValue(body.contentType, forHTTPHeaderField: "Content-Type")
+          urlRequest.setValue(body.contentType, forHTTPHeaderField: "Content-Type")
         }
 
-        urlRequest.addValue("application/json", forHTTPHeaderField: "Accept")
-
-        additionalHeaderFields.forEach { key, value in
+        for (key, value) in additionalHeaderFields {
           urlRequest.setValue(value, forHTTPHeaderField: key)
         }
 
@@ -153,7 +178,7 @@ public extension NetworkRequest {
 
 // MARK: - Decodable response, decodable error
 
-public extension NetworkRequest where Response: Decodable & Sendable, ErrorResponse: Decodable & Swift.Error & Sendable {
+public extension NetworkRequest where Response: Decodable & Sendable, ErrorResponse: Decodable & Sendable {
 
   /// Builds a JSON request whose successful response decodes into `Response`
   /// and whose non-2xx response decodes into a throwable `ErrorResponse`.
@@ -161,8 +186,12 @@ public extension NetworkRequest where Response: Decodable & Sendable, ErrorRespo
   /// This is the most common shape for talking to JSON APIs that return a
   /// structured error envelope on failure.
   ///
-  /// Status codes in `200..<300` decode the body as `Response`; any other
-  /// status decodes the body as `ErrorResponse` and throws it.
+  /// **Status-code handling:**
+  /// - `200..<300`: the body is decoded as `Response`.
+  /// - Any other status (including non-`HTTPURLResponse`): the body is
+  ///   decoded as `ErrorResponse` and thrown. If that decode fails, an
+  ///   ``UnexpectedHTTPResponse`` is thrown instead, preserving the status
+  ///   code and raw body.
   ///
   /// - Parameters:
   ///   - httpMethod: The HTTP method to use. Defaults to ``HTTPMethod/get``.
@@ -172,7 +201,7 @@ public extension NetworkRequest where Response: Decodable & Sendable, ErrorRespo
   ///   - cachePolicy: A cache policy to apply, or `nil` for the default.
   ///   - timeoutInterval: A timeout in seconds, or `nil` for the default.
   ///   - decoder: The `JSONDecoder` used for both success and error
-  ///     decoding. Defaults to one with `dateDecodingStrategy = .iso8601`.
+  ///     decoding. Defaults to a decoder configured for ISO-8601 dates.
   init(
     httpMethod: HTTPMethod = .get,
     url: @autoclosure @Sendable @escaping () throws -> URL,
@@ -180,13 +209,8 @@ public extension NetworkRequest where Response: Decodable & Sendable, ErrorRespo
     additionalHeaderFields: [String: String] = [:],
     cachePolicy: URLRequest.CachePolicy? = nil,
     timeoutInterval: TimeInterval? = nil,
-    decoder: JSONDecoder = {
-      let decoder = JSONDecoder()
-      decoder.dateDecodingStrategy = .iso8601
-      return decoder
-    }()
+    decoder: JSONDecoder = .iso8601
   ) {
-
     self.init(
       httpMethod: httpMethod,
       url: url,
@@ -195,30 +219,38 @@ public extension NetworkRequest where Response: Decodable & Sendable, ErrorRespo
       cachePolicy: cachePolicy,
       timeoutInterval: timeoutInterval,
       parse: { data, urlResponse in
-        guard let httpUrlResponse = urlResponse as? HTTPURLResponse,
-           200 ..< 300 ~= httpUrlResponse.statusCode else {
-
-          let error = try decoder.decode(ErrorResponse.self, from: data)
-          throw error
+        let statusCode = (urlResponse as? HTTPURLResponse)?.statusCode ?? -1
+        if 200 ..< 300 ~= statusCode {
+          return try decoder.decode(Response.self, from: data)
         }
-
-        return try decoder.decode(Response.self, from: data)
+        let decodedError: ErrorResponse
+        do {
+          decodedError = try decoder.decode(ErrorResponse.self, from: data)
+        } catch {
+          throw UnexpectedHTTPResponse(statusCode: statusCode, data: data)
+        }
+        throw decodedError
       }
     )
   }
 }
 
-// MARK: - Decodable response, no error type
+// MARK: - Decodable response, UnexpectedHTTPResponse error
 
-public extension NetworkRequest where Response: Decodable & Sendable, ErrorResponse == Void {
+public extension NetworkRequest where Response: Decodable & Sendable, ErrorResponse == UnexpectedHTTPResponse {
 
-  /// Builds a JSON request whose response decodes into `Response`, without
-  /// any structured error decoding.
+  /// Builds a JSON request that validates the HTTP status code without
+  /// requiring a typed error envelope.
   ///
-  /// Use this overload for endpoints where you don't model failures as a
-  /// typed payload. Failures still propagate — they will surface as
-  /// transport errors thrown by `URLSession` or as decoding errors thrown
-  /// by the decoder when the response body doesn't match `Response`.
+  /// Useful for APIs whose only failure signal is the status code (CRUD
+  /// endpoints, S3-style services). Saves callers from defining a
+  /// placeholder `Decodable & Error` type just to satisfy the typed-error
+  /// overload.
+  ///
+  /// **Status-code handling:**
+  /// - `200..<300`: the body is decoded as `Response`.
+  /// - Any other status (including non-`HTTPURLResponse`): an
+  ///   ``UnexpectedHTTPResponse`` is thrown with the status code and raw body.
   ///
   /// - Parameters:
   ///   - httpMethod: The HTTP method to use. Defaults to ``HTTPMethod/get``.
@@ -235,13 +267,134 @@ public extension NetworkRequest where Response: Decodable & Sendable, ErrorRespo
     additionalHeaderFields: [String: String] = [:],
     cachePolicy: URLRequest.CachePolicy? = nil,
     timeoutInterval: TimeInterval? = nil,
-    decoder: JSONDecoder = {
-      let decoder = JSONDecoder()
-      decoder.dateDecodingStrategy = .iso8601
-      return decoder
-    }()
+    decoder: JSONDecoder = .iso8601
   ) {
+    self.init(
+      httpMethod: httpMethod,
+      url: url,
+      body: body,
+      additionalHeaderFields: additionalHeaderFields,
+      cachePolicy: cachePolicy,
+      timeoutInterval: timeoutInterval,
+      parse: { data, urlResponse in
+        let statusCode = (urlResponse as? HTTPURLResponse)?.statusCode ?? -1
+        if 200 ..< 300 ~= statusCode {
+          return try decoder.decode(Response.self, from: data)
+        }
+        throw UnexpectedHTTPResponse(statusCode: statusCode, data: data)
+      }
+    )
+  }
+}
 
+// MARK: - Raw Data response, UnexpectedHTTPResponse error
+
+public extension NetworkRequest where Response == Data, ErrorResponse == UnexpectedHTTPResponse {
+
+  /// Builds a request whose successful response is returned as raw `Data`,
+  /// validating the HTTP status code without requiring a typed error envelope.
+  ///
+  /// **Status-code handling:**
+  /// - `200..<300`: the raw response bytes are returned.
+  /// - Any other status (including non-`HTTPURLResponse`): an
+  ///   ``UnexpectedHTTPResponse`` is thrown with the status code and raw body.
+  init(
+    httpMethod: HTTPMethod = .get,
+    url: @autoclosure @Sendable @escaping () throws -> URL,
+    body: NetworkRequestBody? = nil,
+    additionalHeaderFields: [String: String] = [:],
+    cachePolicy: URLRequest.CachePolicy? = nil,
+    timeoutInterval: TimeInterval? = nil
+  ) {
+    self.init(
+      httpMethod: httpMethod,
+      url: url,
+      body: body,
+      additionalHeaderFields: additionalHeaderFields,
+      cachePolicy: cachePolicy,
+      timeoutInterval: timeoutInterval,
+      parse: { data, urlResponse in
+        let statusCode = (urlResponse as? HTTPURLResponse)?.statusCode ?? -1
+        if 200 ..< 300 ~= statusCode {
+          return data
+        }
+        throw UnexpectedHTTPResponse(statusCode: statusCode, data: data)
+      }
+    )
+  }
+}
+
+// MARK: - Void response, UnexpectedHTTPResponse error
+
+public extension NetworkRequest where Response == Void, ErrorResponse == UnexpectedHTTPResponse {
+
+  /// Builds a request that ignores the success body and validates the HTTP
+  /// status code without requiring a typed error envelope.
+  ///
+  /// Useful for fire-and-forget endpoints where you still want a non-2xx
+  /// response to fail loudly.
+  ///
+  /// **Status-code handling:**
+  /// - `200..<300`: returns `()`.
+  /// - Any other status (including non-`HTTPURLResponse`): an
+  ///   ``UnexpectedHTTPResponse`` is thrown with the status code and raw body.
+  init(
+    httpMethod: HTTPMethod = .get,
+    url: @autoclosure @Sendable @escaping () throws -> URL,
+    body: NetworkRequestBody? = nil,
+    additionalHeaderFields: [String: String] = [:],
+    cachePolicy: URLRequest.CachePolicy? = nil,
+    timeoutInterval: TimeInterval? = nil
+  ) {
+    self.init(
+      httpMethod: httpMethod,
+      url: url,
+      body: body,
+      additionalHeaderFields: additionalHeaderFields,
+      cachePolicy: cachePolicy,
+      timeoutInterval: timeoutInterval,
+      parse: { data, urlResponse in
+        let statusCode = (urlResponse as? HTTPURLResponse)?.statusCode ?? -1
+        if 200 ..< 300 ~= statusCode {
+          return ()
+        }
+        throw UnexpectedHTTPResponse(statusCode: statusCode, data: data)
+      }
+    )
+  }
+}
+
+// MARK: - Decodable response, no error type
+
+public extension NetworkRequest where Response: Decodable & Sendable, ErrorResponse == Never {
+
+  /// Builds a JSON request whose response decodes into `Response`, without
+  /// any structured error decoding.
+  ///
+  /// **This overload does not validate the HTTP status code.** A non-2xx
+  /// response is fed to the decoder as-is — if the body is not parseable as
+  /// `Response`, you will see a `DecodingError`. Use the
+  /// ``init(httpMethod:url:body:additionalHeaderFields:cachePolicy:timeoutInterval:decoder:)-(_,_,_,_,_,_,_)``
+  /// overload that takes a typed `ErrorResponse` if you need status-code-aware
+  /// error handling.
+  ///
+  /// - Parameters:
+  ///   - httpMethod: The HTTP method to use. Defaults to ``HTTPMethod/get``.
+  ///   - url: The destination URL.
+  ///   - body: The request body to send, or `nil`.
+  ///   - additionalHeaderFields: Extra headers to set on the request.
+  ///   - cachePolicy: A cache policy to apply, or `nil` for the default.
+  ///   - timeoutInterval: A timeout in seconds, or `nil` for the default.
+  ///   - decoder: The `JSONDecoder` used to decode the response body.
+  init(
+    httpMethod: HTTPMethod = .get,
+    url: @autoclosure @Sendable @escaping () throws -> URL,
+    body: NetworkRequestBody? = nil,
+    additionalHeaderFields: [String: String] = [:],
+    cachePolicy: URLRequest.CachePolicy? = nil,
+    timeoutInterval: TimeInterval? = nil,
+    decoder: JSONDecoder = .iso8601
+  ) {
     self.init(
       httpMethod: httpMethod,
       url: url,
@@ -256,22 +409,19 @@ public extension NetworkRequest where Response: Decodable & Sendable, ErrorRespo
   }
 }
 
-// MARK: - Raw Data response
+// MARK: - Raw Data response, no error type
 
-public extension NetworkRequest where Response == Data, ErrorResponse == Void {
+public extension NetworkRequest where Response == Data, ErrorResponse == Never {
 
   /// Builds a request whose response is returned as raw `Data`.
   ///
   /// Useful for downloading binary content, capturing pre-parsed payloads
   /// for inspection, or interacting with non-JSON endpoints.
   ///
-  /// - Parameters:
-  ///   - httpMethod: The HTTP method to use. Defaults to ``HTTPMethod/get``.
-  ///   - url: The destination URL.
-  ///   - body: The request body to send, or `nil`.
-  ///   - additionalHeaderFields: Extra headers to set on the request.
-  ///   - cachePolicy: A cache policy to apply, or `nil` for the default.
-  ///   - timeoutInterval: A timeout in seconds, or `nil` for the default.
+  /// **This overload does not validate the HTTP status code.** A 4xx/5xx
+  /// response is returned to the caller as raw bytes. Use the overload
+  /// whose `ErrorResponse` is `Decodable` or ``UnexpectedHTTPResponse`` if
+  /// you need status-code-aware error handling.
   init(
     httpMethod: HTTPMethod = .get,
     url: @autoclosure @Sendable @escaping () throws -> URL,
@@ -280,7 +430,6 @@ public extension NetworkRequest where Response == Data, ErrorResponse == Void {
     cachePolicy: URLRequest.CachePolicy? = nil,
     timeoutInterval: TimeInterval? = nil
   ) {
-
     self.init(
       httpMethod: httpMethod,
       url: url,
@@ -288,61 +437,26 @@ public extension NetworkRequest where Response == Data, ErrorResponse == Void {
       additionalHeaderFields: additionalHeaderFields,
       cachePolicy: cachePolicy,
       timeoutInterval: timeoutInterval,
-      parse: { data, _ in
-        data
-      }
+      parse: { data, _ in data }
     )
   }
 }
 
-// MARK: - Void response, void error (fire-and-forget)
+// MARK: - Raw Data response, decodable error
 
-public extension NetworkRequest where Response == Void, ErrorResponse == Void {
+public extension NetworkRequest where Response == Data, ErrorResponse: Decodable & Sendable {
 
-  /// Builds a fire-and-forget request that ignores the response body.
+  /// Builds a request whose successful response is returned as raw `Data`,
+  /// and whose non-2xx response decodes into a throwable `ErrorResponse`.
   ///
-  /// The response body is dropped and parsing always succeeds with `()`.
-  /// HTTP-level failures still surface through the transport's error path.
+  /// Useful when downloading binary content (images, files) from a JSON API
+  /// that returns structured error envelopes on failure.
   ///
-  /// - Parameters:
-  ///   - httpMethod: The HTTP method to use. Defaults to ``HTTPMethod/get``.
-  ///   - url: The destination URL.
-  ///   - body: The request body to send, or `nil`.
-  ///   - additionalHeaderFields: Extra headers to set on the request.
-  ///   - cachePolicy: A cache policy to apply, or `nil` for the default.
-  ///   - timeoutInterval: A timeout in seconds, or `nil` for the default.
-  init(
-    httpMethod: HTTPMethod = .get,
-    url: @autoclosure @Sendable @escaping () throws -> URL,
-    body: NetworkRequestBody? = nil,
-    additionalHeaderFields: [String: String] = [:],
-    cachePolicy: URLRequest.CachePolicy? = nil,
-    timeoutInterval: TimeInterval? = nil
-  ) {
-
-    self.init(
-      httpMethod: httpMethod,
-      url: url,
-      body: body,
-      additionalHeaderFields: additionalHeaderFields,
-      cachePolicy: cachePolicy,
-      timeoutInterval: timeoutInterval,
-      parse: { _, _ in
-        ()
-      }
-    )
-  }
-}
-
-// MARK: - Void response, decodable error
-
-public extension NetworkRequest where Response == Void, ErrorResponse: Decodable & Swift.Error & Sendable {
-
-  /// Builds a request that ignores the success response body but decodes a
-  /// structured error on non-2xx responses.
-  ///
-  /// Useful for `DELETE` or `POST` endpoints where success carries no
-  /// payload but failures do.
+  /// **Status-code handling:**
+  /// - `200..<300`: the raw response bytes are returned.
+  /// - Any other status (including non-`HTTPURLResponse`): the body is
+  ///   decoded as `ErrorResponse` and thrown. If that decode fails, an
+  ///   ``UnexpectedHTTPResponse`` is thrown instead.
   ///
   /// - Parameters:
   ///   - httpMethod: The HTTP method to use. Defaults to ``HTTPMethod/get``.
@@ -359,13 +473,8 @@ public extension NetworkRequest where Response == Void, ErrorResponse: Decodable
     additionalHeaderFields: [String: String] = [:],
     cachePolicy: URLRequest.CachePolicy? = nil,
     timeoutInterval: TimeInterval? = nil,
-    decoder: JSONDecoder = {
-      let decoder = JSONDecoder()
-      decoder.dateDecodingStrategy = .iso8601
-      return decoder
-    }()
+    decoder: JSONDecoder = .iso8601
   ) {
-
     self.init(
       httpMethod: httpMethod,
       url: url,
@@ -374,14 +483,108 @@ public extension NetworkRequest where Response == Void, ErrorResponse: Decodable
       cachePolicy: cachePolicy,
       timeoutInterval: timeoutInterval,
       parse: { data, urlResponse in
-        guard let httpUrlResponse = urlResponse as? HTTPURLResponse,
-           200 ..< 300 ~= httpUrlResponse.statusCode else {
-
-          let error = try decoder.decode(ErrorResponse.self, from: data)
-          throw error
+        let statusCode = (urlResponse as? HTTPURLResponse)?.statusCode ?? -1
+        if 200 ..< 300 ~= statusCode {
+          return data
         }
+        let decodedError: ErrorResponse
+        do {
+          decodedError = try decoder.decode(ErrorResponse.self, from: data)
+        } catch {
+          throw UnexpectedHTTPResponse(statusCode: statusCode, data: data)
+        }
+        throw decodedError
+      }
+    )
+  }
+}
 
-        return ()
+// MARK: - Void response, void error (fire-and-forget)
+
+public extension NetworkRequest where Response == Void, ErrorResponse == Never {
+
+  /// Builds a fire-and-forget request that ignores the response body.
+  ///
+  /// The response body is dropped and parsing always succeeds with `()`.
+  ///
+  /// **This overload does not validate the HTTP status code.** Even a 5xx
+  /// response is treated as success at the parse layer; HTTP-level failures
+  /// can only surface through the transport's own error path. Use the
+  /// overload whose `ErrorResponse` is `Decodable` or
+  /// ``UnexpectedHTTPResponse`` if you need status-code-aware error
+  /// handling.
+  init(
+    httpMethod: HTTPMethod = .get,
+    url: @autoclosure @Sendable @escaping () throws -> URL,
+    body: NetworkRequestBody? = nil,
+    additionalHeaderFields: [String: String] = [:],
+    cachePolicy: URLRequest.CachePolicy? = nil,
+    timeoutInterval: TimeInterval? = nil
+  ) {
+    self.init(
+      httpMethod: httpMethod,
+      url: url,
+      body: body,
+      additionalHeaderFields: additionalHeaderFields,
+      cachePolicy: cachePolicy,
+      timeoutInterval: timeoutInterval,
+      parse: { _, _ in () }
+    )
+  }
+}
+
+// MARK: - Void response, decodable error
+
+public extension NetworkRequest where Response == Void, ErrorResponse: Decodable & Sendable {
+
+  /// Builds a request that ignores the success response body but decodes a
+  /// structured error on non-2xx responses.
+  ///
+  /// Useful for `DELETE` or `POST` endpoints where success carries no
+  /// payload but failures do.
+  ///
+  /// **Status-code handling:**
+  /// - `200..<300`: the body is discarded and `()` is returned.
+  /// - Any other status (including non-`HTTPURLResponse`): the body is
+  ///   decoded as `ErrorResponse` and thrown. If that decode fails, an
+  ///   ``UnexpectedHTTPResponse`` is thrown instead.
+  ///
+  /// - Parameters:
+  ///   - httpMethod: The HTTP method to use. Defaults to ``HTTPMethod/get``.
+  ///   - url: The destination URL.
+  ///   - body: The request body to send, or `nil`.
+  ///   - additionalHeaderFields: Extra headers to set on the request.
+  ///   - cachePolicy: A cache policy to apply, or `nil` for the default.
+  ///   - timeoutInterval: A timeout in seconds, or `nil` for the default.
+  ///   - decoder: The `JSONDecoder` used to decode the error body.
+  init(
+    httpMethod: HTTPMethod = .get,
+    url: @autoclosure @Sendable @escaping () throws -> URL,
+    body: NetworkRequestBody? = nil,
+    additionalHeaderFields: [String: String] = [:],
+    cachePolicy: URLRequest.CachePolicy? = nil,
+    timeoutInterval: TimeInterval? = nil,
+    decoder: JSONDecoder = .iso8601
+  ) {
+    self.init(
+      httpMethod: httpMethod,
+      url: url,
+      body: body,
+      additionalHeaderFields: additionalHeaderFields,
+      cachePolicy: cachePolicy,
+      timeoutInterval: timeoutInterval,
+      parse: { data, urlResponse in
+        let statusCode = (urlResponse as? HTTPURLResponse)?.statusCode ?? -1
+        if 200 ..< 300 ~= statusCode {
+          return ()
+        }
+        let decodedError: ErrorResponse
+        do {
+          decodedError = try decoder.decode(ErrorResponse.self, from: data)
+        } catch {
+          throw UnexpectedHTTPResponse(statusCode: statusCode, data: data)
+        }
+        throw decodedError
       }
     )
   }

@@ -1,53 +1,56 @@
 //
-//  Copyright © 2023 Marvin Nazari. All rights reserved.
+//  Copyright © 2026 Marvin Nazari. All rights reserved.
 //
 
 import Foundation
 
 extension URLRequest {
+
+  /// Renders a `curl` command equivalent to this request.
+  ///
+  /// Returns `nil` when the request has no URL — without one there is
+  /// nothing meaningful to render. Binary (non-UTF8) bodies are reported
+  /// as `# (binary body of N bytes omitted)` rather than producing a
+  /// runnable-but-incorrect command.
   var cURLCommand: String? {
+    guard let url = url else { return nil }
     var command = "curl"
 
     if let httpMethod = httpMethod {
       command.append(commandLineArgument: "-X \(httpMethod)")
     }
 
-    // HTTP Body
     if let httpBody = httpBody, !httpBody.isEmpty {
-      var bodyString = String(data: httpBody, encoding: .utf8) ?? ""
-      [("\\", "\\\\"), ("`", "\\`"), ("\"", "\\\""), ("$", "\\$")].forEach { search, replace in
-        bodyString = bodyString.replacingOccurrences(of: search, with: replace)
+      if var bodyString = String(data: httpBody, encoding: .utf8) {
+        for (search, replace) in [("\\", "\\\\"), ("`", "\\`"), ("\"", "\\\""), ("$", "\\$")] {
+          bodyString = bodyString.replacingOccurrences(of: search, with: replace)
+        }
+        command.append(commandLineArgument: "-d \"\(bodyString)\"")
+      } else {
+        command.append(commandLineArgument: "# (binary body of \(httpBody.count) bytes omitted)")
       }
-
-      command.append(commandLineArgument: "-d \"\(bodyString)\"")
     }
 
-    // Encoding
-    if let acceptEncoderHeader = allHTTPHeaderFields?["Accept-Encoding"], (acceptEncoderHeader as NSString).range(of: "gzip").location != NSNotFound {
+    if let acceptEncoding = allHTTPHeaderFields?["Accept-Encoding"], acceptEncoding.contains("gzip") {
       command.append(commandLineArgument: "--compressed")
     }
 
-    // Cookie
-    if let url = url, let cookies = HTTPCookieStorage.shared.cookies(for: url), !cookies.isEmpty {
-      let cookieCommand = cookies.map {
-        "\($0.name)=\($0.value);"
-      }
-      .joined()
-      command.append(commandLineArgument: "--cookie \"\(cookieCommand)\"")
+    if let cookies = HTTPCookieStorage.shared.cookies(for: url), !cookies.isEmpty {
+      let cookieString = cookies.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
+      command.append(commandLineArgument: "--cookie \"\(cookieString)\"")
     }
 
-    // Header fields
     if let allHTTPHeaderFields = allHTTPHeaderFields {
       for (header, value) in allHTTPHeaderFields {
-        command.append(commandLineArgument: "-H '\(header): \(value.replacingOccurrences(of: "\'", with: "\\\'"))'")
+        // Wrap header values in single quotes. Use the ANSI-C trick for
+        // embedded apostrophes: end the quoted string, insert an escaped
+        // apostrophe, reopen — `'\''`.
+        let escaped = value.replacingOccurrences(of: "'", with: "'\\''")
+        command.append(commandLineArgument: "-H '\(header): \(escaped)'")
       }
     }
 
-    // URL
-    if let url = url {
-      command.append(commandLineArgument: "\"\(url.absoluteString)\"")
-    }
-
+    command.append(commandLineArgument: "\"\(url.absoluteString)\"")
     return command
   }
 }

@@ -1,5 +1,5 @@
 //
-//  Copyright © 2023 Marvin Nazari. All rights reserved.
+//  Copyright © 2026 Marvin Nazari. All rights reserved.
 //
 
 import Foundation
@@ -26,7 +26,9 @@ public struct NetworkRequestBody: Sendable {
   /// - Parameters:
   ///   - data: The encoded body bytes.
   ///   - contentType: The MIME type to advertise in the `Content-Type` header.
+  ///     Must be non-empty.
   public init(data: Data, contentType: String) {
+    precondition(!contentType.isEmpty, "NetworkRequestBody.contentType must not be empty")
     self.data = data
     self.contentType = contentType
   }
@@ -39,17 +41,12 @@ public extension NetworkRequestBody {
   ///
   /// - Parameters:
   ///   - parameters: The value to encode. Any `Encodable` type is accepted.
-  ///   - encoder: The encoder to use. Defaults to a `JSONEncoder` with
-  ///     `dateEncodingStrategy = .iso8601`.
+  ///   - encoder: The encoder to use. Defaults to `JSONEncoder.iso8601`.
   /// - Returns: A request body containing the JSON-encoded payload.
   /// - Throws: Whatever `encoder.encode(_:)` throws.
   static func json(
     parameters: Encodable,
-    encoder: JSONEncoder = {
-      let encoder = JSONEncoder()
-      encoder.dateEncodingStrategy = .iso8601
-      return encoder
-    }()
+    encoder: JSONEncoder = .iso8601
   ) throws -> Self {
 
     Self(
@@ -66,21 +63,16 @@ public extension NetworkRequestBody {
   ///
   /// - Parameters:
   ///   - parameters: The key/value pairs to encode as a JSON object.
-  ///   - encoder: The encoder to use. Defaults to a `JSONEncoder` with
-  ///     `dateEncodingStrategy = .iso8601`.
+  ///   - encoder: The encoder to use. Defaults to `JSONEncoder.iso8601`.
   /// - Returns: A request body containing the JSON-encoded object.
   /// - Throws: Whatever `encoder.encode(_:)` throws.
   static func json(
     parameters: [String: Encodable],
-    encoder: JSONEncoder = {
-      let encoder = JSONEncoder()
-      encoder.dateEncodingStrategy = .iso8601
-      return encoder
-    }()
+    encoder: JSONEncoder = .iso8601
   ) throws -> Self {
 
     Self(
-      data: try encoder.encode(parameters.compactMapValues { AnyEncodable($0) }),
+      data: try encoder.encode(parameters.mapValues { AnyEncodable($0) }),
       contentType: "application/json"
     )
   }
@@ -94,23 +86,46 @@ public extension NetworkRequestBody {
   /// - Returns: A request body containing the form-encoded payload.
   static func form(
     dictionary: [String: String]
-  ) throws -> Self {
+  ) -> Self {
 
-    var urlParser = URLComponents()
-    urlParser.queryItems = dictionary.map {
+    var components = URLComponents()
+    components.queryItems = dictionary.map {
       URLQueryItem(name: $0, value: $1)
     }
 
-    let data = urlParser
-      .percentEncodedQuery?
-      .data(using: .utf8) ?? Data()
+    let data = components.percentEncodedQuery?.data(using: .utf8) ?? Data()
 
     return Self(
       data: data,
       contentType: "application/x-www-form-urlencoded"
     )
   }
+}
 
+public extension JSONDecoder {
+  /// A new `JSONDecoder` configured for ISO-8601 dates, used as the default
+  /// decoder for the typed `NetworkRequest` initializers.
+  ///
+  /// A fresh instance is returned on each access — modifying one returned
+  /// instance does not affect future ones.
+  static var iso8601: JSONDecoder {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    return decoder
+  }
+}
+
+public extension JSONEncoder {
+  /// A new `JSONEncoder` configured for ISO-8601 dates, used as the default
+  /// encoder for ``NetworkRequestBody/json(parameters:encoder:)-(Encodable,_)``.
+  ///
+  /// A fresh instance is returned on each access — modifying one returned
+  /// instance does not affect future ones.
+  static var iso8601: JSONEncoder {
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .iso8601
+    return encoder
+  }
 }
 
 private struct AnyEncodable: Encodable {

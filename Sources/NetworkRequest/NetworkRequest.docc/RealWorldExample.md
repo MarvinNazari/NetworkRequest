@@ -137,6 +137,8 @@ extension APIRequest where Response == User {
 extension APIRequest where Response == User {
     static func updateName(_ name: String) -> Self {
         APIRequest { config in
+            // The `try` is for `.json(parameters:)`, which can throw
+            // encoder errors — `NetworkRequest.init` itself does not throw.
             try NetworkRequest(
                 httpMethod: .patch,
                 url: config.baseURL.appendingPathComponent("me"),

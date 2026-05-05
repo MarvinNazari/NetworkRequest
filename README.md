@@ -39,7 +39,7 @@ A non-2xx response decodes the body as `APIError` and throws it — your
 - **Type-safe.** A `NetworkRequest<User, APIError>` carries both the success
   and the failure shape in its type.
 - **Execution-agnostic.** No baked-in transport. Use `URLSession`, mock it,
-  swap it for Combine, run it on Linux.
+  swap it for Combine, plug in your own.
 - **Sendable-clean.** Builds cleanly under Swift 6 strict concurrency and
   conditionally conforms to `Sendable` when its generic parameters do.
 - **Zero dependencies.** Just Foundation.

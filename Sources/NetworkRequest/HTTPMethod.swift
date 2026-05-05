@@ -1,5 +1,5 @@
 //
-//  Copyright © 2023 Marvin Nazari. All rights reserved.
+//  Copyright © 2026 Marvin Nazari. All rights reserved.
 //
 
 import Foundation
@@ -7,9 +7,10 @@ import Foundation
 /// An HTTP request method.
 ///
 /// `HTTPMethod` is a thin, extensible wrapper around the HTTP method string.
-/// The standard methods defined by RFC 9110 are exposed as static properties
-/// (``get``, ``post``, ``put``, ``patch``, ``delete``, etc.), and you can
-/// define custom methods by calling ``init(rawValue:)`` directly:
+/// The standard methods from RFC 9110 (and `PATCH` from RFC 5789) are
+/// exposed as static properties (``get``, ``post``, ``put``, ``patch``,
+/// ``delete``, etc.). Custom methods are defined by calling
+/// ``init(rawValue:)`` directly:
 ///
 /// ```swift
 /// extension HTTPMethod {
@@ -18,7 +19,9 @@ import Foundation
 /// ```
 public struct HTTPMethod: RawRepresentable, Hashable, Sendable {
 
-  /// The uppercased HTTP method string (for example, `"GET"` or `"POST"`).
+  /// The HTTP method string. Conventionally uppercased; the type does not
+  /// enforce that — the `URLRequest.httpMethod` you ship will use exactly
+  /// what you supply here.
   public let rawValue: String
 
   /// Creates an HTTP method from its raw string value.

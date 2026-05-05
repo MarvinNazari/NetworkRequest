@@ -6,7 +6,7 @@ import Foundation
 struct NetworkRequestTests {
 
   @Test func defaultMethodIsGET() throws {
-    let request = NetworkRequest<Data, Void>(
+    let request = NetworkRequest<Data, Never>(
       url: URL(string: "https://example.com/x")!
     )
     let urlRequest = try request.urlRequest()
@@ -14,7 +14,7 @@ struct NetworkRequestTests {
   }
 
   @Test func httpMethodIsPropagated() throws {
-    let request = NetworkRequest<Data, Void>(
+    let request = NetworkRequest<Data, Never>(
       httpMethod: .post,
       url: URL(string: "https://example.com/x")!
     )
@@ -23,7 +23,7 @@ struct NetworkRequestTests {
   }
 
   @Test func acceptHeaderDefaultsToJSON() throws {
-    let request = NetworkRequest<Data, Void>(
+    let request = NetworkRequest<Data, Never>(
       url: URL(string: "https://example.com/x")!
     )
     let urlRequest = try request.urlRequest()
@@ -32,7 +32,7 @@ struct NetworkRequestTests {
 
   @Test func bodyContentTypeHeaderSet() throws {
     let body = NetworkRequestBody(data: Data("hi".utf8), contentType: "text/plain")
-    let request = NetworkRequest<Data, Void>(
+    let request = NetworkRequest<Data, Never>(
       httpMethod: .post,
       url: URL(string: "https://example.com/x")!,
       body: body
@@ -43,7 +43,7 @@ struct NetworkRequestTests {
   }
 
   @Test func additionalHeadersMerged() throws {
-    let request = NetworkRequest<Data, Void>(
+    let request = NetworkRequest<Data, Never>(
       url: URL(string: "https://example.com/x")!,
       additionalHeaderFields: [
         "Authorization": "Bearer abc",
@@ -55,8 +55,29 @@ struct NetworkRequestTests {
     #expect(urlRequest.value(forHTTPHeaderField: "X-Custom") == "value")
   }
 
+  @Test func additionalHeadersOverrideAccept() throws {
+    let request = NetworkRequest<Data, Never>(
+      url: URL(string: "https://example.com/x")!,
+      additionalHeaderFields: ["Accept": "application/xml"]
+    )
+    let urlRequest = try request.urlRequest()
+    #expect(urlRequest.value(forHTTPHeaderField: "Accept") == "application/xml")
+  }
+
+  @Test func additionalHeadersOverrideBodyContentType() throws {
+    let body = NetworkRequestBody(data: Data("hi".utf8), contentType: "text/plain")
+    let request = NetworkRequest<Data, Never>(
+      httpMethod: .post,
+      url: URL(string: "https://example.com/x")!,
+      body: body,
+      additionalHeaderFields: ["Content-Type": "application/xml"]
+    )
+    let urlRequest = try request.urlRequest()
+    #expect(urlRequest.value(forHTTPHeaderField: "Content-Type") == "application/xml")
+  }
+
   @Test func cachePolicyApplied() throws {
-    let request = NetworkRequest<Data, Void>(
+    let request = NetworkRequest<Data, Never>(
       url: URL(string: "https://example.com/x")!,
       cachePolicy: .reloadIgnoringLocalCacheData
     )
@@ -64,8 +85,16 @@ struct NetworkRequestTests {
     #expect(urlRequest.cachePolicy == .reloadIgnoringLocalCacheData)
   }
 
+  @Test func nilCachePolicyUsesSystemDefault() throws {
+    let request = NetworkRequest<Data, Never>(
+      url: URL(string: "https://example.com/x")!
+    )
+    let urlRequest = try request.urlRequest()
+    #expect(urlRequest.cachePolicy == .useProtocolCachePolicy)
+  }
+
   @Test func timeoutIntervalApplied() throws {
-    let request = NetworkRequest<Data, Void>(
+    let request = NetworkRequest<Data, Never>(
       url: URL(string: "https://example.com/x")!,
       timeoutInterval: 7
     )
@@ -73,9 +102,17 @@ struct NetworkRequestTests {
     #expect(urlRequest.timeoutInterval == 7)
   }
 
+  @Test func nilTimeoutUsesSystemDefault() throws {
+    let request = NetworkRequest<Data, Never>(
+      url: URL(string: "https://example.com/x")!
+    )
+    let urlRequest = try request.urlRequest()
+    #expect(urlRequest.timeoutInterval == 60)
+  }
+
   @Test func urlClosureEvaluatedLazily() throws {
     let counter = Counter()
-    let request = NetworkRequest<Data, Void>(
+    let request = NetworkRequest<Data, Never>(
       urlRequest: {
         counter.increment()
         return URLRequest(url: URL(string: "https://example.com/x")!)

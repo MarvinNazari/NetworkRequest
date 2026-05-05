@@ -75,6 +75,13 @@ in the shared cookie storage. Paste it into a terminal to reproduce the
 request outside your app:
 
 ```swift
-print(request.cURLCommand)
+print(request.cURLCommand ?? "<request unavailable>")
 // curl -X POST -d "..." -H 'Content-Type: application/json' "https://api.example.com/users"
 ```
+
+The property returns `nil` if the URL closure throws or the underlying
+request has no URL. Header values containing apostrophes are escaped using
+the ANSI-C `'\''` trick so the rendered command pastes cleanly into a
+shell. Binary (non-UTF-8) bodies are reported as
+`# (binary body of N bytes omitted)` rather than producing a misleading
+`-d ""`.
