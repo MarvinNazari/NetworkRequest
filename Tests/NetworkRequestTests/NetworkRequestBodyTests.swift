@@ -12,6 +12,10 @@ private struct ThrowingEncodable: Encodable {
   func encode(to encoder: Encoder) throws { throw Boom() }
 }
 
+private struct Stamped: Encodable {
+  let at: Date
+}
+
 @Suite("NetworkRequestBody")
 struct NetworkRequestBodyTests {
 
@@ -47,7 +51,6 @@ struct NetworkRequestBodyTests {
   }
 
   @Test func jsonUsesISO8601DateStrategyByDefault() throws {
-    struct Stamped: Encodable { let at: Date }
     let date = Date(timeIntervalSince1970: 0)
     let body = try NetworkRequestBody.json(parameters: Stamped(at: date))
     let string = String(data: body.data, encoding: .utf8) ?? ""
@@ -55,7 +58,6 @@ struct NetworkRequestBodyTests {
   }
 
   @Test func jsonRespectsCustomEncoder() throws {
-    struct Stamped: Encodable { let at: Date }
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .secondsSince1970
     let body = try NetworkRequestBody.json(
