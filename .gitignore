@@ -23,6 +23,12 @@ xcuserdata
 build
 DerivedData
 
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+docs/
+
 # ruby
 .bundle
 .config
