@@ -66,7 +66,7 @@ In Xcode: **File ▸ Add Package Dependencies…** and paste the URL.
 Full API reference and articles (Getting Started, Building Requests,
 Parsing Responses, Request Bodies) are published at:
 
-**https://marvinnazari.github.io/NetworkRequest/documentation/networkrequest/**
+**https://wavio.co/NetworkRequest/documentation/networkrequest/**
 
 The same documentation is bundled as a DocC catalog inside the package; in
 Xcode, choose **Product ▸ Build Documentation** to browse it locally.
