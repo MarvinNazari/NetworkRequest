@@ -69,10 +69,9 @@ In Xcode: **File ▸ Add Package Dependencies…** and paste the URL.
 
 ## Documentation
 
-Full API reference and articles (Getting Started, Building Requests,
-Parsing Responses, Request Bodies) are published at:
-
-**https://wavio.co/NetworkRequest/documentation/networkrequest/**
+Full API reference and articles (Getting Started, A Real-World Example,
+Recipes, Building Requests, Parsing Responses, Request Bodies) are
+published as **[Documentation](https://wavio.co/NetworkRequest/documentation/networkrequest/)**.
 
 The same documentation is bundled as a DocC catalog inside the package; in
 Xcode, choose **Product ▸ Build Documentation** to browse it locally.
