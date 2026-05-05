@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- *Recipes* DocC article: copy-paste patterns for `URLSession` dispatch,
+  bearer-token auth with refresh, `URLProtocol` mocking in tests, request
+  logging, retry with exponential backoff, multi-format date decoding,
+  cursor pagination, and response-header inspection.
+
+### Planned
+
+- `NetworkRequestBody.multipart(...)` helper for `multipart/form-data`
+  payloads. Deferred — needs careful boundary/quoting/charset handling
+  per RFC 7578 and a thorough test suite.
+
 ## [1.0.0] - 2026-05-05
 
 First public release.

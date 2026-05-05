@@ -34,6 +34,7 @@ kind of error the API may return.
 
 - <doc:GettingStarted>
 - <doc:RealWorldExample>
+- <doc:Recipes>
 
 ### Building Requests
 
