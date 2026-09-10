@@ -67,6 +67,57 @@ targets: [
 
 In Xcode: **File ▸ Add Package Dependencies…** and paste the URL.
 
+## Testing
+
+The package ships a second product, **`NetworkRequestTesting`**, so you can
+unit test request building and response parsing without touching the
+network. Add it to your test target only:
+
+```swift
+.testTarget(
+    name: "MyAppTests",
+    dependencies: ["MyApp", .product(name: "NetworkRequestTesting", package: "NetworkRequest")]
+)
+```
+
+`StubURLProtocol` builds an isolated `URLSession` that answers every request
+through your handler, and `send(using:)` runs a `NetworkRequest` through it
+in one line:
+
+```swift
+import Testing
+import NetworkRequest
+import NetworkRequestTesting
+
+@Test func fetchesTheCurrentUser() async throws {
+    let recorder = RequestRecorder()
+    let session = StubURLProtocol.session { request in
+        await recorder.record(request)
+        return .response(.json(#"{"id":1,"name":"Ada"}"#))
+    }
+
+    let user = try await me.send(using: session)
+
+    #expect(user.name == "Ada")
+    let sent = try #require(await recorder.last)
+    #expect(sent.url?.path == "/me")
+    #expect(sent.queryDictionary == ["expand": "profile"])
+    #expect(sent.value(forHTTPHeaderField: "Authorization") == "Bearer \(token)")
+}
+```
+
+Also included:
+
+- `StubURLProtocol.session(returning:)` — same response every time.
+- `StubURLProtocol.session(sequence:)` — scripted responses in order; an
+  extra request fails with a descriptive `SequenceExhausted` error.
+- `.failure(URLError(...))` outcomes to simulate transport errors.
+- `URLRequest` inspection helpers: `queryItems`, `queryDictionary`,
+  `bodyString`, `jsonBody`, `jsonArrayBody`, `formBody`.
+- `NetworkRequest.makeURLRequest()` for assertions on the built request.
+
+Every stub session has its own handler, so suites run safely in parallel.
+
 ## Documentation
 
 Full API reference and articles (Getting Started, A Real-World Example,

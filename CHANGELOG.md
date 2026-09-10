@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `NetworkRequestTesting` library product for unit testing without the
+  network: `StubURLProtocol` (per-session handlers, `session(_:)`,
+  `session(returning:)`, `session(sequence:)`, `Response`/`Outcome`),
+  `RequestRecorder` actor, `URLRequest` inspection helpers (`queryItems`,
+  `queryDictionary`, `bodyString`, `jsonBody`, `jsonArrayBody`, `formBody`),
+  and `NetworkRequest.send(using:)` / `makeURLRequest()`. The core
+  `NetworkRequest` product is unchanged.
+
 ## [1.0.0] - 2026-05-05
 
 First public release.
