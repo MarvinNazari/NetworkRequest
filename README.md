@@ -67,6 +67,67 @@ targets: [
 
 In Xcode: **File ▸ Add Package Dependencies…** and paste the URL.
 
+## Testing
+
+The package ships a second product, **`NetworkRequestTesting`**, so you can
+unit test request building and response parsing without touching the
+network. Add it to your test target only:
+
+```swift
+.testTarget(
+    name: "MyAppTests",
+    dependencies: ["MyApp", .product(name: "NetworkRequestTesting", package: "NetworkRequest")]
+)
+```
+
+It adds exactly three types — `StubURLProtocol`, `RequestRecorder` and
+`RecordedRequest` — and no extensions on `NetworkRequest`, `URLRequest`,
+`URLSession` or any other type it does not own.
+
+`StubURLProtocol` builds an isolated `URLSession` that answers every request
+through your handler. Sending a request is the same two lines as in
+production code, because the core already exposes both closures:
+
+```swift
+import Testing
+import NetworkRequest
+import NetworkRequestTesting
+
+@Test func fetchesTheCurrentUser() async throws {
+    let recorder = RequestRecorder()
+    let session = StubURLProtocol.session { request in
+        await recorder.record(request)
+        return .response(.json(#"{"id":1,"name":"Ada"}"#))
+    }
+
+    let (data, response) = try await session.data(for: try me.urlRequest())
+    let user = try me.parse(data, response)
+
+    #expect(user.name == "Ada")
+    let sent = try #require(await recorder.last)
+    #expect(sent.path == "/me")
+    #expect(sent.queryDictionary == ["expand": "profile"])
+    #expect(sent.headers["Authorization"] == "Bearer \(token)")
+}
+```
+
+Also included:
+
+- `StubURLProtocol.session(returning:)` — same response every time.
+- `StubURLProtocol.session(sequence:)` — scripted responses in order; an
+  extra request fails with a descriptive `SequenceExhausted` error.
+- `StubURLProtocol.session(recording:returning:)` — record into a
+  `RequestRecorder` and always reply the same way.
+- `.failure(URLError(...))` outcomes to simulate transport errors.
+- `RecordedRequest`, a value wrapper around the request that was sent, with
+  `urlRequest`, `url`, `method`, `path`, `headers`, `queryItems`,
+  `queryDictionary`, `body`, `bodyString`, `jsonBody()`, `jsonArrayBody()`
+  and `formBody`. The JSON accessors throw, so a malformed body fails the
+  test instead of reading as `nil`. Wrap a request you built yourself with
+  `RecordedRequest(try request.urlRequest())` to assert on it.
+
+Every stub session has its own handler, so suites run safely in parallel.
+
 ## Documentation
 
 Full API reference and articles (Getting Started, A Real-World Example,

@@ -16,6 +16,10 @@ let package = Package(
             name: "NetworkRequest",
             targets: ["NetworkRequest"]
         ),
+        .library(
+            name: "NetworkRequestTesting",
+            targets: ["NetworkRequestTesting"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.0"),
@@ -24,9 +28,17 @@ let package = Package(
         .target(
             name: "NetworkRequest"
         ),
+        .target(
+            name: "NetworkRequestTesting",
+            dependencies: ["NetworkRequest"]
+        ),
         .testTarget(
             name: "NetworkRequestTests",
             dependencies: ["NetworkRequest"]
+        ),
+        .testTarget(
+            name: "NetworkRequestTestingTests",
+            dependencies: ["NetworkRequest", "NetworkRequestTesting"]
         ),
     ]
 )

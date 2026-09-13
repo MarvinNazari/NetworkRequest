@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `NetworkRequestTesting` library product for unit testing without the
+  network. Its entire public surface is three types, and it deliberately
+  adds no extensions to types it does not own:
+  - `StubURLProtocol` — per-session handlers via `session(_:)`,
+    `session(returning:)`, `session(sequence:)` and
+    `session(recording:returning:)`, with nested `Response`, `Outcome`,
+    `SequenceExhausted` and `Handler`.
+  - `RequestRecorder` — an actor collecting every request that reaches a
+    stub, exposing `requests`, `last`, `count`, `record(_:)` and `reset()`.
+  - `RecordedRequest` — a `Sendable` wrapper over a `URLRequest` with
+    assertion helpers: `urlRequest`, `url`, `method`, `path`, `headers`,
+    `queryItems`, `queryDictionary`, `body`, `bodyString`, `jsonBody()`,
+    `jsonArrayBody()` and `formBody`. The JSON accessors throw, so a
+    malformed body fails a test instead of reading as `nil`.
+
+  Tests send a request with the closures the core already exposes:
+  `let (data, response) = try await session.data(for: try request.urlRequest())`
+  followed by `let value = try request.parse(data, response)`. The core
+  `NetworkRequest` product is unchanged.
+
 ## [1.0.0] - 2026-05-05
 
 First public release.
