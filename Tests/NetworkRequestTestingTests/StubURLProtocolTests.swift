@@ -154,9 +154,9 @@ struct StubURLProtocolTests {
     _ = try await session.data(for: request)
 
     let recorded = try #require(await seen.last)
-    #expect(recorded.httpMethod == "PUT")
+    #expect(recorded.method == "PUT")
     #expect(recorded.url == url)
-    #expect(recorded.value(forHTTPHeaderField: "Authorization") == "Bearer t")
-    #expect(recorded.allHTTPHeaderFields?.keys.contains { $0.hasPrefix("X-StubURLProtocol") } == false)
+    #expect(recorded.headers["Authorization"] == "Bearer t")
+    #expect(recorded.headers.keys.contains { $0.hasPrefix("X-StubURLProtocol") } == false)
   }
 }

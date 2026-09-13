@@ -4,8 +4,11 @@
 
 import Foundation
 
-/// Collects the `URLRequest`s that pass through a stub so a test can assert
-/// on what was sent after the fact.
+/// Collects the requests that pass through a stub so a test can assert on
+/// what was sent after the fact.
+///
+/// Each request is stored as a ``RecordedRequest``, which carries the
+/// original `URLRequest` plus assertion helpers.
 ///
 /// ```swift
 /// let recorder = RequestRecorder()
@@ -14,8 +17,9 @@ import Foundation
 ///   return .response(.empty())
 /// }
 ///
-/// try await request.send(using: session)
-/// #expect(await recorder.last?.httpMethod == "POST")
+/// let (data, response) = try await session.data(for: try request.urlRequest())
+/// _ = try request.parse(data, response)
+/// #expect(await recorder.last?.method == "POST")
 /// ```
 ///
 /// ``StubURLProtocol/session(recording:returning:)`` wires this up for the
@@ -23,19 +27,19 @@ import Foundation
 public actor RequestRecorder {
 
   /// Every recorded request, oldest first.
-  public private(set) var requests: [URLRequest] = []
+  public private(set) var requests: [RecordedRequest] = []
 
   public init() {}
 
   /// The most recently recorded request, or `nil` if none was recorded.
-  public var last: URLRequest? { requests.last }
+  public var last: RecordedRequest? { requests.last }
 
   /// The number of recorded requests.
   public var count: Int { requests.count }
 
-  /// Appends `request` to ``requests``.
+  /// Wraps `request` in a ``RecordedRequest`` and appends it to ``requests``.
   public func record(_ request: URLRequest) {
-    requests.append(request)
+    requests.append(RecordedRequest(request))
   }
 
   /// Discards every recorded request.

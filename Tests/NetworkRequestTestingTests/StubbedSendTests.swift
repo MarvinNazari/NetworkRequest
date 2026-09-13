@@ -12,12 +12,22 @@ private struct APIError: Decodable, Error, Equatable, Sendable {
   let message: String
 }
 
-@Suite("NetworkRequest + Testing")
-struct NetworkRequestSendTests {
+/// The two-line shape the library documents: build and send the request with
+/// `URLSession`, then feed the reply back through `parse`.
+private func send<Response, ErrorResponse>(
+  _ request: NetworkRequest<Response, ErrorResponse>,
+  using session: URLSession
+) async throws -> Response {
+  let (data, response) = try await session.data(for: try request.urlRequest())
+  return try request.parse(data, response)
+}
+
+@Suite("Sending a NetworkRequest through a stub")
+struct StubbedSendTests {
 
   private let url = URL(string: "https://api.example.com/me")!
 
-  @Test func makeURLRequestInvokesTheClosure() throws {
+  @Test func buildsTheRequestFromItsComponents() throws {
     let request = NetworkRequest<User, APIError>(
       httpMethod: .post,
       url: url,
@@ -25,19 +35,19 @@ struct NetworkRequestSendTests {
       additionalHeaderFields: ["Authorization": "Bearer t"]
     )
 
-    let built = try request.makeURLRequest()
+    let built = RecordedRequest(try request.urlRequest())
     #expect(built.url == url)
-    #expect(built.httpMethod == "POST")
-    #expect(built.value(forHTTPHeaderField: "Authorization") == "Bearer t")
+    #expect(built.method == "POST")
+    #expect(built.headers["Authorization"] == "Bearer t")
     #expect(built.formBody == ["q": "a b"])
   }
 
-  @Test func makeURLRequestPropagatesErrors() {
+  @Test func buildingPropagatesErrors() {
     let request = NetworkRequest<User, APIError>(url: URL(string: ""))
-    #expect(throws: URLError.self) { try request.makeURLRequest() }
+    #expect(throws: URLError.self) { try request.urlRequest() }
   }
 
-  @Test func sendDecodesASuccessfulResponse() async throws {
+  @Test func decodesASuccessfulResponse() async throws {
     let recorder = RequestRecorder()
     let session = StubURLProtocol.session(recording: recorder, returning: .json(#"{"id":1,"name":"Ada"}"#))
 
@@ -45,21 +55,22 @@ struct NetworkRequestSendTests {
       url: url,
       additionalHeaderFields: ["Authorization": "Bearer t"]
     )
-    let user = try await request.send(using: session)
+    let user = try await send(request, using: session)
 
     #expect(user == User(id: 1, name: "Ada"))
     let sent = try #require(await recorder.last)
     #expect(sent.url == url)
-    #expect(sent.value(forHTTPHeaderField: "Authorization") == "Bearer t")
-    #expect(sent.value(forHTTPHeaderField: "Accept") == "application/json")
+    #expect(sent.path == "/me")
+    #expect(sent.headers["Authorization"] == "Bearer t")
+    #expect(sent.headers["Accept"] == "application/json")
   }
 
-  @Test func sendThrowsUnexpectedHTTPResponseForNon2xx() async throws {
+  @Test func throwsUnexpectedHTTPResponseForNon2xx() async throws {
     let session = StubURLProtocol.session(returning: .json(#"{"unexpected":"shape"}"#, status: 503))
     let request = NetworkRequest<User, UnexpectedHTTPResponse>(url: url)
 
     do {
-      _ = try await request.send(using: session)
+      _ = try await send(request, using: session)
       Issue.record("expected UnexpectedHTTPResponse")
     } catch let error as UnexpectedHTTPResponse {
       #expect(error.statusCode == 503)
@@ -67,34 +78,34 @@ struct NetworkRequestSendTests {
     }
   }
 
-  @Test func sendThrowsTypedErrorEnvelope() async throws {
+  @Test func throwsTypedErrorEnvelope() async throws {
     let session = StubURLProtocol.session(returning: .json(#"{"message":"nope"}"#, status: 401))
     let request = NetworkRequest<User, APIError>(url: url)
 
     await #expect(throws: APIError(message: "nope")) {
-      try await request.send(using: session)
+      try await send(request, using: session)
     }
   }
 
-  @Test func sendSurfacesTransportFailures() async throws {
+  @Test func surfacesTransportFailures() async throws {
     let session = StubURLProtocol.session { _ in .failure(URLError(.cannotFindHost)) }
     let request = NetworkRequest<User, APIError>(url: url)
 
     await #expect(throws: URLError.self) {
-      try await request.send(using: session)
+      try await send(request, using: session)
     }
   }
 
-  @Test func sendWorksWithSequences() async throws {
+  @Test func worksWithSequences() async throws {
     let session = StubURLProtocol.session(sequence: [
       .response(.json(#"{"id":1,"name":"Ada"}"#)),
       .response(.json(#"{"id":2,"name":"Grace"}"#)),
     ])
     let request = NetworkRequest<User, APIError>(url: url)
 
-    #expect(try await request.send(using: session) == User(id: 1, name: "Ada"))
-    #expect(try await request.send(using: session) == User(id: 2, name: "Grace"))
-    await #expect { try await request.send(using: session) } throws: { error in
+    #expect(try await send(request, using: session) == User(id: 1, name: "Ada"))
+    #expect(try await send(request, using: session) == User(id: 2, name: "Grace"))
+    await #expect { try await send(request, using: session) } throws: { error in
       StubURLProtocol.SequenceExhausted.matches(error)
     }
   }

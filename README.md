@@ -80,9 +80,13 @@ network. Add it to your test target only:
 )
 ```
 
+It adds exactly three types — `StubURLProtocol`, `RequestRecorder` and
+`RecordedRequest` — and no extensions on `NetworkRequest`, `URLRequest`,
+`URLSession` or any other type it does not own.
+
 `StubURLProtocol` builds an isolated `URLSession` that answers every request
-through your handler, and `send(using:)` runs a `NetworkRequest` through it
-in one line:
+through your handler. Sending a request is the same two lines as in
+production code, because the core already exposes both closures:
 
 ```swift
 import Testing
@@ -96,13 +100,14 @@ import NetworkRequestTesting
         return .response(.json(#"{"id":1,"name":"Ada"}"#))
     }
 
-    let user = try await me.send(using: session)
+    let (data, response) = try await session.data(for: try me.urlRequest())
+    let user = try me.parse(data, response)
 
     #expect(user.name == "Ada")
     let sent = try #require(await recorder.last)
-    #expect(sent.url?.path == "/me")
+    #expect(sent.path == "/me")
     #expect(sent.queryDictionary == ["expand": "profile"])
-    #expect(sent.value(forHTTPHeaderField: "Authorization") == "Bearer \(token)")
+    #expect(sent.headers["Authorization"] == "Bearer \(token)")
 }
 ```
 
@@ -111,10 +116,15 @@ Also included:
 - `StubURLProtocol.session(returning:)` — same response every time.
 - `StubURLProtocol.session(sequence:)` — scripted responses in order; an
   extra request fails with a descriptive `SequenceExhausted` error.
+- `StubURLProtocol.session(recording:returning:)` — record into a
+  `RequestRecorder` and always reply the same way.
 - `.failure(URLError(...))` outcomes to simulate transport errors.
-- `URLRequest` inspection helpers: `queryItems`, `queryDictionary`,
-  `bodyString`, `jsonBody`, `jsonArrayBody`, `formBody`.
-- `NetworkRequest.makeURLRequest()` for assertions on the built request.
+- `RecordedRequest`, a value wrapper around the request that was sent, with
+  `urlRequest`, `url`, `method`, `path`, `headers`, `queryItems`,
+  `queryDictionary`, `body`, `bodyString`, `jsonBody()`, `jsonArrayBody()`
+  and `formBody`. The JSON accessors throw, so a malformed body fails the
+  test instead of reading as `nil`. Wrap a request you built yourself with
+  `RecordedRequest(try request.urlRequest())` to assert on it.
 
 Every stub session has its own handler, so suites run safely in parallel.
 

@@ -16,7 +16,8 @@ import Foundation
 ///   return .response(.json(#"{"id":1,"name":"Ada"}"#))
 /// }
 ///
-/// let user = try await request.send(using: session)
+/// let (data, response) = try await session.data(for: try request.urlRequest())
+/// let user = try request.parse(data, response)
 /// ```
 public final class StubURLProtocol: URLProtocol, @unchecked Sendable {
 
