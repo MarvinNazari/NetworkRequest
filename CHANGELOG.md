@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-13
+
 ### Added
 
 - `NetworkRequestTesting` library product for unit testing without the
@@ -75,4 +77,5 @@ First public release.
 - Swift 6.2 toolchain (Xcode 17+)
 - iOS 13+, macOS 10.15+, tvOS 13+, watchOS 6+
 
+[1.1.0]: https://github.com/MarvinNazari/NetworkRequest/releases/tag/1.1.0
 [1.0.0]: https://github.com/MarvinNazari/NetworkRequest/releases/tag/1.0.0
